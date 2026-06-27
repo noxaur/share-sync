@@ -9,6 +9,7 @@ assert.ok(match, 'IndexHtml transformation registration not found');
 
 const pattern = new RegExp(match[1].replace(/\\\\/g, '\\'));
 
+assert.equal(pattern.test('/index.html'), true);
 assert.equal(pattern.test('index.html'), true);
 assert.equal(pattern.test('/session/login/index.html'), false);
 assert.equal(pattern.test('session-login-index-html.7df1620bd3afcef60eb7.chunk.js'), false);
