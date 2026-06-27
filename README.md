@@ -42,6 +42,7 @@ dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.6.0.zip
 
 ```sh
 node scripts/syncplay-share.selftest.js
+node scripts/transformation-pattern.selftest.js
 dotnet build Jellyfin.Plugin.SyncPlayShare.sln /property:GenerateFullPaths=true /consoleloggerparameters:NoSummary
 ```
 
