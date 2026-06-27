@@ -8,12 +8,12 @@
     "category": "General",
     "versions": [
       {
-        "version": "1.0.6.0",
-        "changelog": "Defer SyncPlay Share behavior while on login routes.",
+        "version": "1.0.7.0",
+        "changelog": "Skip non-HTML transformation payloads so Jellyfin chunks stay valid.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.6.0.zip",
-        "checksum": "3D92147880B38EEC804E2553F7789B9D",
-        "timestamp": "2026-06-27T04:27:09",
+        "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.7.0.zip",
+        "checksum": "A2E09D13A9C63DFD143CA85CDC9B981A",
+        "timestamp": "2026-06-27T12:45:00",
         "dependencies": [
           "5e87cc92-571a-4d8d-8d98-d2d4147f9f90"
         ]
