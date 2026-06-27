@@ -37,6 +37,12 @@ public static class TransformationPatches
             return contents;
         }
 
+        if (!IsHtmlDocument(contents))
+        {
+            plugin.LogDebug("Payload is not an HTML document; leaving unchanged.");
+            return contents;
+        }
+
         if (contents.Contains(InlineMarker, StringComparison.Ordinal))
         {
             plugin.LogDebug("Inline script already present; leaving index.html unchanged.");
@@ -59,6 +65,13 @@ public static class TransformationPatches
         }
 
         return contents.Insert(bodyIndex, scriptTag);
+    }
+
+    private static bool IsHtmlDocument(string contents)
+    {
+        return contents.Contains("<!doctype html", StringComparison.OrdinalIgnoreCase)
+            || contents.Contains("<html", StringComparison.OrdinalIgnoreCase)
+            || contents.Contains("<body", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetClientScript(Plugin plugin)
