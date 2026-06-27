@@ -8,12 +8,12 @@
     "category": "General",
     "versions": [
       {
-        "version": "1.0.7.6",
+        "version": "1.0.7.7",
         "changelog": "Fail closed when index transformation errors.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.7.6.zip",
-        "checksum": "943B1411B29B9E87A17484184494239B",
-        "timestamp": "2026-06-27T10:57:13",
+        "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.7.7.zip",
+        "checksum": "3C21EE3298BF871CA09BD468B46EDCE0",
+        "timestamp": "2026-06-27T10:58:33",
         "dependencies": [
           "5e87cc92-571a-4d8d-8d98-d2d4147f9f90"
         ]
