@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Reflection;
 using Jellyfin.Plugin.SyncPlayShare.Helpers;
+using Jellyfin.Plugin.SyncPlayShare.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jellyfin.Plugin.SyncPlayShare.Controllers;
@@ -23,6 +24,12 @@ public class SyncPlayShareController : ControllerBase
     {
         Plugin? plugin = Plugin.Instance;
         plugin?.LogInfo("Script served.");
+        if (plugin is not null)
+        {
+            StartupService.RegisterTransformations(plugin);
+        }
+
+        Response.Headers["X-SyncPlayShare-Version"] = typeof(Plugin).Assembly.GetName().Version?.ToString();
 
         Stream? stream = Assembly.GetExecutingAssembly()
             .GetManifestResourceStream(typeof(Plugin).Namespace + ".Assets.syncplay-share.js");
