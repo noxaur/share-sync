@@ -8,12 +8,12 @@
     "category": "General",
     "versions": [
       {
-        "version": "1.0.8.0",
+        "version": "1.0.8.1",
         "changelog": "Add debug instrumentation for SyncPlay menu injection.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.8.0.zip",
-        "checksum": "BD01B74EB0127C1DC3537801034A01C1",
-        "timestamp": "2026-06-27T12:25:05",
+        "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.8.1.zip",
+        "checksum": "57E35EA6B1D55DCB753F372D741D3538",
+        "timestamp": "2026-06-27T12:26:33",
         "dependencies": [
           "5e87cc92-571a-4d8d-8d98-d2d4147f9f90"
         ]
