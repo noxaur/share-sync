@@ -14,5 +14,15 @@ on:
   workflow_dispatch:
 
 jobs:
+  self-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/syncplay-share.selftest.js
+      - run: node scripts/transformation-pattern.selftest.js
+
   call:
     uses: jellyfin/jellyfin-meta-plugins/.github/workflows/test.yaml@master
