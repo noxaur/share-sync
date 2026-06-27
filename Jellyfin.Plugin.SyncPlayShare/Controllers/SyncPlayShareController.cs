@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
-using System.Text.Json;
+using Jellyfin.Plugin.SyncPlayShare.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jellyfin.Plugin.SyncPlayShare.Controllers;
@@ -49,19 +49,7 @@ public class SyncPlayShareController : ControllerBase
             Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
         }
 
-        object config = new
-        {
-            enabled = plugin?.Configuration.Enabled ?? false,
-            logLevel = plugin?.Configuration.LogLevel.ToString() ?? "Error",
-            clientConsoleLogging = plugin?.Configuration.ClientConsoleLogging ?? false,
-            copyToastEnabled = plugin?.Configuration.CopyToastEnabled ?? true,
-            shareButtonLabel = plugin?.Configuration.ShareButtonLabel ?? "Share"
-        };
-
-        script = script.Replace(
-            "__SYNCPLAY_SHARE_CONFIG__",
-            JsonSerializer.Serialize(config),
-            StringComparison.Ordinal);
+        script = plugin is null ? script : PluginScriptRenderer.Render(script, plugin.Configuration);
 
         return Content(script, "application/javascript");
     }

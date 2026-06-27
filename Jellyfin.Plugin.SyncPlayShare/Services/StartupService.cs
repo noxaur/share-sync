@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.SyncPlayShare.Helpers;
+using MediaBrowser.Common.Configuration;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -18,14 +21,17 @@ namespace Jellyfin.Plugin.SyncPlayShare.Services;
 public class StartupService : IScheduledTask
 {
     private readonly ILogger<StartupService> _logger;
+    private readonly IApplicationPaths _applicationPaths;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="StartupService"/> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
-    public StartupService(ILogger<StartupService> logger)
+    /// <param name="applicationPaths">The application paths.</param>
+    public StartupService(ILogger<StartupService> logger, IApplicationPaths applicationPaths)
     {
         _logger = logger;
+        _applicationPaths = applicationPaths;
     }
 
     /// <inheritdoc />
@@ -76,26 +82,14 @@ public class StartupService : IScheduledTask
                 return Task.CompletedTask;
             }
 
-            Dictionary<string, string?> payload = new Dictionary<string, string?>
-            {
-                ["id"] = "c282f8dd-2b02-45dd-b1b6-6c168b43c0a5",
-                ["fileNamePattern"] = "index\\.html",
-                ["callbackAssembly"] = GetType().Assembly.FullName,
-                ["callbackClass"] = typeof(TransformationPatches).FullName,
-                ["callbackMethod"] = nameof(TransformationPatches.IndexHtml)
-            };
-            Type payloadType = registerMethod.GetParameters()[0].ParameterType;
-            MethodInfo? parseMethod = payloadType.GetMethod("Parse", [typeof(string)]);
-            object? fileTransformationPayload = parseMethod?.Invoke(null, [JsonSerializer.Serialize(payload)]);
+            RegisterTransformation(
+                registerMethod,
+                plugin,
+                "c282f8dd-2b02-45dd-b1b6-6c168b43c0a5",
+                "index.html",
+                nameof(TransformationPatches.IndexHtml));
 
-            if (fileTransformationPayload is null)
-            {
-                plugin.LogError(null, "Could not create File Transformation payload.");
-                return Task.CompletedTask;
-            }
-
-            registerMethod.Invoke(null, [fileTransformationPayload]);
-            plugin.LogInfo("File Transformation registered for index.html.");
+            RegisterSyncPlayChunkTransformations(registerMethod, plugin);
         }
         catch (Exception ex)
         {
@@ -115,5 +109,71 @@ public class StartupService : IScheduledTask
                 Type = TaskTriggerInfoType.StartupTrigger
             }
         ];
+    }
+
+    private static void RegisterTransformation(
+        MethodInfo registerMethod,
+        Plugin plugin,
+        string id,
+        string fileNamePattern,
+        string callbackMethod)
+    {
+        Dictionary<string, string?> payload = new Dictionary<string, string?>
+        {
+            ["id"] = id,
+            ["fileNamePattern"] = fileNamePattern,
+            ["callbackAssembly"] = typeof(StartupService).Assembly.FullName,
+            ["callbackClass"] = typeof(TransformationPatches).FullName,
+            ["callbackMethod"] = callbackMethod
+        };
+        Type payloadType = registerMethod.GetParameters()[0].ParameterType;
+        MethodInfo? parseMethod = payloadType.GetMethod("Parse", [typeof(string)]);
+        object? fileTransformationPayload = parseMethod?.Invoke(null, [JsonSerializer.Serialize(payload)]);
+
+        if (fileTransformationPayload is null)
+        {
+            plugin.LogError(null, "Could not create File Transformation payload.");
+            return;
+        }
+
+        registerMethod.Invoke(null, [fileTransformationPayload]);
+        plugin.LogInfo("File Transformation registered for " + fileNamePattern + ".");
+    }
+
+    private void RegisterSyncPlayChunkTransformations(MethodInfo registerMethod, Plugin plugin)
+    {
+        if (string.IsNullOrWhiteSpace(_applicationPaths.WebPath) || !Directory.Exists(_applicationPaths.WebPath))
+        {
+            plugin.LogError(null, "Jellyfin web path missing; cannot register SyncPlay chunk transformation.");
+            return;
+        }
+
+        Regex chunkName = new Regex(@"([^.]+)\.[^.]+\.chunk\.js", RegexOptions.Compiled);
+        foreach (string jsChunk in Directory.GetFiles(_applicationPaths.WebPath, "*.chunk.js", SearchOption.AllDirectories))
+        {
+            string chunkContents = File.ReadAllText(jsChunk);
+            if (!chunkContents.Contains("halt-playback", StringComparison.Ordinal)
+                || !chunkContents.Contains("leave-group", StringComparison.Ordinal)
+                || !chunkContents.Contains("settings", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string fileName = Path.GetFileName(jsChunk);
+            Match match = chunkName.Match(fileName);
+            if (!match.Success)
+            {
+                continue;
+            }
+
+            string fileNamePattern = match.Groups[1].Value + "\\.[^.]+\\.chunk\\.js";
+            plugin.LogInfo("Found SyncPlay menu chunk " + fileName + ".");
+            RegisterTransformation(
+                registerMethod,
+                plugin,
+                Guid.NewGuid().ToString(),
+                fileNamePattern,
+                nameof(TransformationPatches.SyncPlayChunk));
+        }
     }
 }

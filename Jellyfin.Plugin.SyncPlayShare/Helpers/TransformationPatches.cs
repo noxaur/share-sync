@@ -1,5 +1,7 @@
 using System;
 using System.Globalization;
+using System.IO;
+using System.Reflection;
 using Jellyfin.Plugin.SyncPlayShare.Models;
 using MediaBrowser.Common.Net;
 
@@ -10,7 +12,7 @@ namespace Jellyfin.Plugin.SyncPlayShare.Helpers;
 /// </summary>
 public static class TransformationPatches
 {
-    private const string ScriptMarker = "syncplay-share.js";
+    private const string InlineMarker = "Jellyfin.Plugin.SyncPlayShare injected";
 
     /// <summary>
     /// Injects the SyncPlay Share script into jellyfin-web.
@@ -35,25 +37,19 @@ public static class TransformationPatches
             return contents;
         }
 
-        if (contents.Contains(ScriptMarker, StringComparison.Ordinal))
+        if (contents.Contains(InlineMarker, StringComparison.Ordinal))
         {
-            plugin.LogDebug("Script tag already present; leaving index.html unchanged.");
+            plugin.LogDebug("Inline script already present; leaving index.html unchanged.");
             return contents;
         }
 
-        string rootPath = GetRootPath(plugin);
-        string version = plugin.Version?.ToString() ?? "0.0.0.0";
-        string scriptUrl = string.Format(
-            CultureInfo.InvariantCulture,
-            "{0}/SyncPlayShare/syncplay-share.js?v={1}",
-            rootPath,
-            Uri.EscapeDataString(version));
         string scriptTag = string.Format(
             CultureInfo.InvariantCulture,
-            "<!-- Jellyfin.Plugin.SyncPlayShare injected --><script type=\"text/javascript\" plugin=\"Jellyfin.Plugin.SyncPlayShare\" src=\"{0}\" defer></script>",
-            scriptUrl);
+            "<!-- {0} --><script type=\"text/javascript\" plugin=\"Jellyfin.Plugin.SyncPlayShare\">{1}</script>",
+            InlineMarker,
+            GetClientScript(plugin));
 
-        plugin.LogDebug("Injecting script: " + scriptUrl);
+        plugin.LogDebug("Injecting inline script into index.html.");
         plugin.LogVerbose("IndexHtml transformation callback exited.");
 
         int bodyIndex = contents.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
@@ -65,15 +61,42 @@ public static class TransformationPatches
         return contents.Insert(bodyIndex, scriptTag);
     }
 
-    private static string GetRootPath(Plugin plugin)
+    /// <summary>
+    /// Appends SyncPlay Share to the lazy-loaded SyncPlay chunk.
+    /// </summary>
+    /// <param name="payload">The File Transformation payload.</param>
+    /// <returns>The transformed content.</returns>
+    public static string SyncPlayChunk(PatchRequestPayload payload)
     {
-        string? baseUrl = plugin.ServerConfigurationManager.GetNetworkConfiguration().BaseUrl;
+        Plugin? plugin = Plugin.Instance;
+        string contents = payload.Contents ?? string.Empty;
 
-        if (string.IsNullOrWhiteSpace(baseUrl))
+        plugin?.LogVerbose("SyncPlayChunk transformation callback entered.");
+
+        if (plugin is null || !plugin.Configuration.Enabled || contents.Contains(InlineMarker, StringComparison.Ordinal))
         {
+            return contents;
+        }
+
+        plugin.LogDebug("Appending SyncPlay Share script to SyncPlay chunk.");
+        return contents + "\n/* " + InlineMarker + " */\n" + GetClientScript(plugin);
+    }
+
+    private static string GetClientScript(Plugin plugin)
+    {
+        Stream? stream = Assembly.GetExecutingAssembly()
+            .GetManifestResourceStream(typeof(Plugin).Namespace + ".Assets.syncplay-share.js");
+
+        if (stream is null)
+        {
+            plugin.LogError(null, "Embedded syncplay-share.js missing.");
             return string.Empty;
         }
 
-        return "/" + baseUrl.Trim('/');
+        using (stream)
+        using (StreamReader reader = new StreamReader(stream))
+        {
+            return PluginScriptRenderer.Render(reader.ReadToEnd(), plugin.Configuration);
+        }
     }
 }
