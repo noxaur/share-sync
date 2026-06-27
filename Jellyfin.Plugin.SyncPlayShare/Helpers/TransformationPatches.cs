@@ -1,9 +1,6 @@
 using System;
 using System.Globalization;
-using System.IO;
-using System.Reflection;
 using Jellyfin.Plugin.SyncPlayShare.Models;
-using MediaBrowser.Common.Net;
 
 namespace Jellyfin.Plugin.SyncPlayShare.Helpers;
 
@@ -64,9 +61,8 @@ public static class TransformationPatches
 
         string scriptTag = string.Format(
             CultureInfo.InvariantCulture,
-            "<!-- {0} --><script type=\"text/javascript\" plugin=\"Jellyfin.Plugin.SyncPlayShare\">{1}</script>",
-            InlineMarker,
-            GetClientScript(plugin));
+            "<!-- {0} --><script defer=\"defer\" type=\"text/javascript\" plugin=\"Jellyfin.Plugin.SyncPlayShare\" src=\"/SyncPlayShare/syncplay-share.js\"></script>",
+            InlineMarker);
 
         plugin.LogDebug("Injecting inline script into index.html.");
         plugin.LogVerbose("IndexHtml transformation callback exited.");
@@ -85,23 +81,5 @@ public static class TransformationPatches
         return contents.Contains("<!doctype html", StringComparison.OrdinalIgnoreCase)
             || contents.Contains("<html", StringComparison.OrdinalIgnoreCase)
             || contents.Contains("<body", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string GetClientScript(Plugin plugin)
-    {
-        Stream? stream = Assembly.GetExecutingAssembly()
-            .GetManifestResourceStream(typeof(Plugin).Namespace + ".Assets.syncplay-share.js");
-
-        if (stream is null)
-        {
-            plugin.LogError(null, "Embedded syncplay-share.js missing.");
-            return string.Empty;
-        }
-
-        using (stream)
-        using (StreamReader reader = new StreamReader(stream))
-        {
-            return PluginScriptRenderer.Render(reader.ReadToEnd(), plugin.Configuration);
-        }
     }
 }
