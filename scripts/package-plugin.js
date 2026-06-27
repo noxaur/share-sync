@@ -5,7 +5,9 @@ const zlib = require('node:zlib');
 const { execFileSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
-const buildYaml = fs.readFileSync(path.join(root, 'build.yaml'), 'utf8');
+const buildYamlPath = path.join(root, 'build.yaml');
+const propsPath = path.join(root, 'Directory.Build.props');
+let buildYaml = fs.readFileSync(buildYamlPath, 'utf8');
 const manifestPath = path.join(root, 'manifest.json');
 const distDir = path.join(root, 'dist');
 const publishDir = path.join(root, 'artifacts', 'plugin');
@@ -20,6 +22,24 @@ const value = (key) => {
   }
   return match[1].trim();
 };
+
+const bumpRevision = (current) => {
+  const parts = current.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) throw new Error(`Bad version ${current}`);
+  parts[3] += 1;
+  return parts.join('.');
+};
+const writeVersion = (next) => {
+  buildYaml = buildYaml.replace(/^version:\s*"?[^"\n]+"?/m, `version: "${next}"`);
+  fs.writeFileSync(buildYamlPath, buildYaml);
+  const props = fs.readFileSync(propsPath, 'utf8').replace(
+    /<(Version|AssemblyVersion|FileVersion)>[^<]+<\/\1>/g,
+    (_, name) => `<${name}>${next}</${name}>`,
+  );
+  fs.writeFileSync(propsPath, props);
+};
+
+if (process.argv.includes('--bump-revision')) writeVersion(bumpRevision(value('version')));
 
 const version = value('version');
 const targetAbi = value('targetAbi');
