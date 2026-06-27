@@ -12,8 +12,8 @@
         "changelog": "Defer SyncPlay Share behavior while on login routes.",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.6.0.zip",
-        "checksum": "BE9B7EA4A825E75144B12F6D28FBEA57",
-        "timestamp": "2026-06-27T08:30:25",
+        "checksum": "C0F849325AF76091EBB7F0E453F4F212",
+        "timestamp": "2026-06-27T09:50:21",
         "dependencies": [
           "5e87cc92-571a-4d8d-8d98-d2d4147f9f90"
         ]
