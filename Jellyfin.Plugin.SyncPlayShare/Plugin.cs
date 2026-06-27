@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Jellyfin.Plugin.SyncPlayShare.Configuration;
+using Jellyfin.Plugin.SyncPlayShare.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
 using MediaBrowser.Controller.Configuration;
@@ -32,6 +33,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         Instance = this;
         ServerConfigurationManager = serverConfigurationManager;
+        StartupService.RegisterTransformations(this);
     }
 
     /// <inheritdoc />

@@ -17,6 +17,8 @@ namespace Jellyfin.Plugin.SyncPlayShare.Services;
 /// </summary>
 public class StartupService : IScheduledTask
 {
+    private static readonly object RegistrationSync = new object();
+    private static bool _registered;
     private readonly ILogger<StartupService> _logger;
 
     /// <summary>
@@ -55,40 +57,58 @@ public class StartupService : IScheduledTask
         plugin.LogInfo("Config loaded.");
         plugin.LogDebug("Enabled=" + plugin.Configuration.Enabled + ", LogLevel=" + plugin.Configuration.LogLevel + ", ClientConsoleLogging=" + plugin.Configuration.ClientConsoleLogging + ", CopyToastEnabled=" + plugin.Configuration.CopyToastEnabled + ", ShareButtonLabel=" + plugin.Configuration.ShareButtonLabel);
 
-        try
-        {
-            Assembly? fileTransformationAssembly = AssemblyLoadContext.All
-                .SelectMany(context => context.Assemblies)
-                .FirstOrDefault(assembly => assembly.FullName?.Contains(".FileTransformation", StringComparison.Ordinal) ?? false);
-
-            if (fileTransformationAssembly is null)
-            {
-                plugin.LogError(null, "File Transformation plugin missing; install it and restart Jellyfin.");
-                return Task.CompletedTask;
-            }
-
-            Type? pluginInterfaceType = fileTransformationAssembly.GetType("Jellyfin.Plugin.FileTransformation.PluginInterface");
-            MethodInfo? registerMethod = pluginInterfaceType?.GetMethod("RegisterTransformation");
-
-            if (registerMethod is null)
-            {
-                plugin.LogError(null, "File Transformation RegisterTransformation method missing.");
-                return Task.CompletedTask;
-            }
-
-            RegisterTransformation(
-                registerMethod,
-                plugin,
-                "c282f8dd-2b02-45dd-b1b6-6c168b43c0a5",
-                "(^|[\\\\/])index\\.html$",
-                nameof(TransformationPatches.IndexHtml));
-        }
-        catch (Exception ex)
-        {
-            plugin.LogError(ex, "Failed to register File Transformation.");
-        }
+        RegisterTransformations(plugin);
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Registers the web transformations.
+    /// </summary>
+    /// <param name="plugin">The plugin instance.</param>
+    public static void RegisterTransformations(Plugin plugin)
+    {
+        lock (RegistrationSync)
+        {
+            if (_registered)
+            {
+                return;
+            }
+
+            try
+            {
+                Assembly? fileTransformationAssembly = AssemblyLoadContext.All
+                    .SelectMany(context => context.Assemblies)
+                    .FirstOrDefault(assembly => assembly.FullName?.Contains(".FileTransformation", StringComparison.Ordinal) ?? false);
+
+                if (fileTransformationAssembly is null)
+                {
+                    plugin.LogError(null, "File Transformation plugin missing; install it and restart Jellyfin.");
+                    return;
+                }
+
+                Type? pluginInterfaceType = fileTransformationAssembly.GetType("Jellyfin.Plugin.FileTransformation.PluginInterface");
+                MethodInfo? registerMethod = pluginInterfaceType?.GetMethod("RegisterTransformation");
+
+                if (registerMethod is null)
+                {
+                    plugin.LogError(null, "File Transformation RegisterTransformation method missing.");
+                    return;
+                }
+
+                RegisterTransformation(
+                    registerMethod,
+                    plugin,
+                    "c282f8dd-2b02-45dd-b1b6-6c168b43c0a5",
+                    "(^|[\\\\/])index\\.html$",
+                    nameof(TransformationPatches.IndexHtml));
+                _registered = true;
+            }
+            catch (Exception ex)
+            {
+                plugin.LogError(ex, "Failed to register File Transformation.");
+            }
+        }
     }
 
     /// <inheritdoc />
