@@ -1,0 +1,329 @@
+(function (root) {
+    'use strict';
+
+    var config = Object.assign({
+        enabled: true,
+        logLevel: 'Info',
+        clientConsoleLogging: false,
+        copyToastEnabled: true,
+        shareButtonLabel: 'Share'
+    }, typeof __SYNCPLAY_SHARE_CONFIG__ === 'undefined' ? {} : __SYNCPLAY_SHARE_CONFIG__);
+
+    var prefix = '[SyncPlayShare]';
+    var pendingKey = 'syncplayShare.pendingGroupId';
+    var activeKey = 'syncplayShare.activeGroupId';
+    var patchedClients = new WeakSet();
+    var observer;
+
+    function logRank(level) {
+        return ['Error', 'Info', 'Debug', 'Verbose'].indexOf(level);
+    }
+
+    function shouldLog(level) {
+        if (level === 'Error') return true;
+        if (!config.clientConsoleLogging) return false;
+        return logRank(config.logLevel) >= logRank(level);
+    }
+
+    function log(level, message, detail) {
+        if (!shouldLog(level) || !root.console) return;
+        var fn = level === 'Error' ? 'error' : level === 'Info' ? 'info' : 'debug';
+        root.console[fn](prefix + ' ' + message, detail || '');
+    }
+
+    function buildShareUrl(locationLike, groupId) {
+        var url = new URL(locationLike.origin + locationLike.pathname);
+        url.searchParams.set('syncplayShare', groupId);
+        return url.toString();
+    }
+
+    function readShareId(urlText) {
+        var url = new URL(urlText);
+        return url.searchParams.get('syncplayShare');
+    }
+
+    function stripShareParam() {
+        var url = new URL(root.location.href);
+        url.searchParams.delete('syncplayShare');
+        root.history.replaceState(root.history.state, root.document.title, url.pathname + url.search + url.hash);
+    }
+
+    function rememberActiveGroup(groupId) {
+        if (!groupId) return;
+        root.sessionStorage.setItem(activeKey, groupId);
+        log('Debug', 'Remembered active group.', groupId);
+    }
+
+    function clearActiveGroup() {
+        root.sessionStorage.removeItem(activeKey);
+        log('Debug', 'Cleared active group.');
+    }
+
+    function toast(message, error) {
+        if (!config.copyToastEnabled && !error) return;
+
+        var elem = root.document.createElement('div');
+        elem.className = 'toast';
+        elem.textContent = message;
+
+        var container = root.document.querySelector('.toastContainer');
+        if (!container) {
+            container = root.document.createElement('div');
+            container.className = 'toastContainer';
+            root.document.body.appendChild(container);
+        }
+
+        container.appendChild(elem);
+        root.setTimeout(function () {
+            elem.classList.add('toastVisible');
+        }, 30);
+        root.setTimeout(function () {
+            elem.classList.add('toastHide');
+            root.setTimeout(function () {
+                if (elem.parentNode) elem.parentNode.removeChild(elem);
+            }, 300);
+        }, 3300);
+    }
+
+    function parseResponseJson(response) {
+        if (!response) return Promise.resolve(null);
+        if (typeof response.json === 'function') {
+            var jsonResponse = typeof response.clone === 'function' ? response.clone() : response;
+            return jsonResponse.json().catch(function () {
+                return null;
+            });
+        }
+
+        return Promise.resolve(response);
+    }
+
+    function patchApiClient(apiClient) {
+        if (!apiClient || patchedClients.has(apiClient)) return;
+        patchedClients.add(apiClient);
+
+        if (typeof apiClient.joinSyncPlayGroup === 'function') {
+            var joinSyncPlayGroup = apiClient.joinSyncPlayGroup;
+            apiClient.joinSyncPlayGroup = function (options) {
+                if (options && options.GroupId) rememberActiveGroup(options.GroupId);
+                return joinSyncPlayGroup.apply(this, arguments);
+            };
+        }
+
+        if (typeof apiClient.createSyncPlayGroup === 'function') {
+            var createSyncPlayGroup = apiClient.createSyncPlayGroup;
+            apiClient.createSyncPlayGroup = function () {
+                var result = createSyncPlayGroup.apply(this, arguments);
+                Promise.resolve(result).then(parseResponseJson).then(function (group) {
+                    if (group && group.GroupId) rememberActiveGroup(group.GroupId);
+                }).catch(function (error) {
+                    log('Error', 'Failed to read created SyncPlay group.', error);
+                });
+                return result;
+            };
+        }
+
+        if (typeof apiClient.leaveSyncPlayGroup === 'function') {
+            var leaveSyncPlayGroup = apiClient.leaveSyncPlayGroup;
+            apiClient.leaveSyncPlayGroup = function () {
+                clearActiveGroup();
+                return leaveSyncPlayGroup.apply(this, arguments);
+            };
+        }
+    }
+
+    function getApiClient() {
+        var apiClient = root.ApiClient;
+        if (apiClient) patchApiClient(apiClient);
+        return apiClient;
+    }
+
+    function listGroups(apiClient) {
+        if (!apiClient || typeof apiClient.getSyncPlayGroups !== 'function') {
+            return Promise.reject(new Error('ApiClient.getSyncPlayGroups unavailable'));
+        }
+
+        return apiClient.getSyncPlayGroups().then(function (response) {
+            if (response && typeof response.json === 'function') {
+                return response.json();
+            }
+
+            return response;
+        });
+    }
+
+    function groupIdFromMenu(menu, apiClient) {
+        var stored = root.sessionStorage.getItem(activeKey);
+        if (stored) return Promise.resolve(stored);
+
+        var title = menu.querySelector('.actionSheetTitle');
+        var groupName = title ? title.textContent.trim() : '';
+        if (!groupName) return Promise.resolve(null);
+
+        return listGroups(apiClient).then(function (groups) {
+            var matches = (groups || []).filter(function (group) {
+                return group.GroupName === groupName;
+            });
+
+            if (matches.length === 1) {
+                rememberActiveGroup(matches[0].GroupId);
+                return matches[0].GroupId;
+            }
+
+            log('Debug', 'Could not infer unique group from menu title.', { groupName: groupName, matches: matches.length });
+            return null;
+        });
+    }
+
+    function copyText(text) {
+        if (root.navigator.clipboard && root.navigator.clipboard.writeText) {
+            return root.navigator.clipboard.writeText(text);
+        }
+
+        var input = root.document.createElement('textarea');
+        input.value = text;
+        input.setAttribute('readonly', 'readonly');
+        input.style.position = 'fixed';
+        input.style.left = '-9999px';
+        root.document.body.appendChild(input);
+        input.select();
+
+        var ok = root.document.execCommand('copy');
+        root.document.body.removeChild(input);
+        return ok ? Promise.resolve() : Promise.reject(new Error('execCommand copy failed'));
+    }
+
+    function shareFromMenu(menu) {
+        var apiClient = getApiClient();
+        return groupIdFromMenu(menu, apiClient).then(function (groupId) {
+            if (!groupId) {
+                toast('No active SyncPlay group found.', true);
+                throw new Error('No active SyncPlay group found');
+            }
+
+            var shareUrl = buildShareUrl(root.location, groupId);
+            return copyText(shareUrl).then(function () {
+                toast('SyncPlay share copied.');
+                log('Info', 'Share copied.', groupId);
+            });
+        }).catch(function (error) {
+            log('Error', 'Share failed.', error);
+            toast('SyncPlay share failed.', true);
+        });
+    }
+
+    function makeShareButton(settingsButton, menu) {
+        var button = settingsButton.cloneNode(true);
+        button.setAttribute('data-id', 'syncplay-share');
+        button.classList.add('syncPlayShareButton');
+        button.removeAttribute('autofocus');
+
+        var icon = button.querySelector('.actionsheetMenuItemIcon');
+        if (icon) {
+            icon.className = icon.className.replace(/\bvideo_settings\b/g, '').trim() + ' share';
+            icon.textContent = '';
+        }
+
+        var text = button.querySelector('.actionSheetItemText');
+        if (text) text.textContent = config.shareButtonLabel || 'Share';
+
+        var secondary = button.querySelector('.secondary');
+        if (secondary) secondary.textContent = 'Copy SyncPlay share';
+
+        button.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            shareFromMenu(menu);
+        }, true);
+
+        return button;
+    }
+
+    function ensureShareButton(menu) {
+        if (!menu || menu.querySelector('.syncPlayShareButton')) return;
+
+        var settingsButton = menu.querySelector('[data-id="settings"]');
+        if (!settingsButton) return;
+
+        settingsButton.parentNode.insertBefore(makeShareButton(settingsButton, menu), settingsButton);
+        log('Debug', 'Share button inserted.');
+    }
+
+    function scanMenus() {
+        root.document.querySelectorAll('.syncPlayGroupMenu').forEach(ensureShareButton);
+    }
+
+    function joinGroup(groupId) {
+        var apiClient = getApiClient();
+        if (!apiClient || typeof apiClient.joinSyncPlayGroup !== 'function') {
+            throw new Error('ApiClient.joinSyncPlayGroup unavailable');
+        }
+
+        return apiClient.joinSyncPlayGroup({ GroupId: groupId }).then(function () {
+            rememberActiveGroup(groupId);
+            toast('SyncPlay share joined.');
+            log('Info', 'Joined shared SyncPlay group.', groupId);
+        });
+    }
+
+    function tryPendingJoin() {
+        var groupId = root.sessionStorage.getItem(pendingKey);
+        if (!groupId) return;
+
+        try {
+            Promise.resolve(joinGroup(groupId)).then(function () {
+                root.sessionStorage.removeItem(pendingKey);
+            }).catch(function (error) {
+                root.sessionStorage.removeItem(pendingKey);
+                log('Error', 'Pending SyncPlay join failed.', error);
+                toast('SyncPlay share join failed.', true);
+            });
+        } catch (error) {
+            log('Debug', 'Pending join waiting for ApiClient.', error);
+        }
+    }
+
+    function captureShareParam() {
+        var groupId = readShareId(root.location.href);
+        if (!groupId) return;
+
+        root.sessionStorage.setItem(pendingKey, groupId);
+        stripShareParam();
+        log('Debug', 'Captured pending share.', groupId);
+    }
+
+    function init() {
+        if (!config.enabled || !root.document) return;
+
+        captureShareParam();
+        patchApiClient(getApiClient());
+        scanMenus();
+        tryPendingJoin();
+
+        observer = new MutationObserver(function () {
+            patchApiClient(getApiClient());
+            scanMenus();
+            tryPendingJoin();
+        });
+        observer.observe(root.document.documentElement, { childList: true, subtree: true });
+        root.setInterval(tryPendingJoin, 1000);
+        log('Info', 'Initialized.');
+    }
+
+    root.SyncPlayShare = {
+        buildShareUrl: buildShareUrl,
+        readShareId: readShareId,
+        shouldLog: shouldLog
+    };
+
+    if (typeof module !== 'undefined') {
+        module.exports = root.SyncPlayShare;
+    }
+
+    if (root.document) {
+        if (root.document.readyState === 'loading') {
+            root.document.addEventListener('DOMContentLoaded', init, { once: true });
+        } else {
+            init();
+        }
+    }
+})(typeof window !== 'undefined' ? window : globalThis);

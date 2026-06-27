@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>SyncPlay Share</title>
+</head>
+<body>
+    <div id="SyncPlayShareConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="SyncPlayShareConfigForm">
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="Enabled" name="Enabled" type="checkbox" is="emby-checkbox" />
+                            <span>Enabled</span>
+                        </label>
+                        <div class="fieldDescription">Injects the Share action into the SyncPlay menu.</div>
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="LogLevel">Log level</label>
+                        <select is="emby-select" id="LogLevel" name="LogLevel" class="emby-select-withcolor emby-select">
+                            <option value="Error">Error</option>
+                            <option value="Info">Info</option>
+                            <option value="Debug">Debug</option>
+                            <option value="Verbose">Verbose</option>
+                        </select>
+                        <div class="fieldDescription">Controls server logs and client diagnostics.</div>
+                    </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="ClientConsoleLogging" name="ClientConsoleLogging" type="checkbox" is="emby-checkbox" />
+                            <span>Client console logging</span>
+                        </label>
+                        <div class="fieldDescription">Writes debug and verbose browser console logs when the log level allows it.</div>
+                    </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="CopyToastEnabled" name="CopyToastEnabled" type="checkbox" is="emby-checkbox" />
+                            <span>Copy toast enabled</span>
+                        </label>
+                        <div class="fieldDescription">Shows a short status toast after sharing actions.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="ShareButtonLabel">Share button label</label>
+                        <input id="ShareButtonLabel" name="ShareButtonLabel" type="text" is="emby-input" />
+                    </div>
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <script type="text/javascript">
+            var SyncPlayShareConfig = {
+                pluginUniqueId: '43f7bc73-726d-4f80-8f26-626a7b4d4b0f'
+            };
+
+            document.querySelector('#SyncPlayShareConfigPage')
+                .addEventListener('pageshow', function() {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(SyncPlayShareConfig.pluginUniqueId).then(function (config) {
+                        var logLevels = ['Error', 'Info', 'Debug', 'Verbose'];
+                        document.querySelector('#Enabled').checked = config.Enabled;
+                        document.querySelector('#LogLevel').value = typeof config.LogLevel === 'number' ? logLevels[config.LogLevel] : config.LogLevel;
+                        document.querySelector('#ClientConsoleLogging').checked = config.ClientConsoleLogging;
+                        document.querySelector('#CopyToastEnabled').checked = config.CopyToastEnabled;
+                        document.querySelector('#ShareButtonLabel').value = config.ShareButtonLabel || 'Share';
+                        Dashboard.hideLoadingMsg();
+                    });
+                });
+
+            document.querySelector('#SyncPlayShareConfigForm')
+                .addEventListener('submit', function(e) {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(SyncPlayShareConfig.pluginUniqueId).then(function (config) {
+                        config.Enabled = document.querySelector('#Enabled').checked;
+                        config.LogLevel = document.querySelector('#LogLevel').value;
+                        config.ClientConsoleLogging = document.querySelector('#ClientConsoleLogging').checked;
+                        config.CopyToastEnabled = document.querySelector('#CopyToastEnabled').checked;
+                        config.ShareButtonLabel = document.querySelector('#ShareButtonLabel').value || 'Share';
+                        ApiClient.updatePluginConfiguration(SyncPlayShareConfig.pluginUniqueId, config).then(function (result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                        });
+                    });
+
+                    e.preventDefault();
+                    return false;
+                });
+        </script>
+    </div>
+</body>
+</html>
