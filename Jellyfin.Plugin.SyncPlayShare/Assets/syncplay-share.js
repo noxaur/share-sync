@@ -7,7 +7,11 @@
         clientConsoleLogging: false,
         copyToastEnabled: true,
         shareButtonLabel: 'Share'
-    }, typeof __SYNCPLAY_SHARE_CONFIG__ === 'undefined' ? {} : __SYNCPLAY_SHARE_CONFIG__);
+    }, (typeof module !== 'undefined' && module.exports) ? {} : __SYNCPLAY_SHARE_CONFIG__);
+
+    if (root.document && root.SyncPlayShareLoaded) {
+        return;
+    }
 
     var prefix = '[SyncPlayShare]';
     var pendingKey = 'syncplayShare.pendingGroupId';
@@ -136,6 +140,10 @@
         var apiClient = root.ApiClient;
         if (apiClient) patchApiClient(apiClient);
         return apiClient;
+    }
+
+    function isAuthenticated(apiClient) {
+        return !!(apiClient && typeof apiClient.accessToken === 'function' && apiClient.accessToken());
     }
 
     function listGroups(apiClient) {
@@ -273,6 +281,10 @@
 
     function joinGroup(groupId) {
         var apiClient = getApiClient();
+        if (!isAuthenticated(apiClient)) {
+            throw new Error('ApiClient is not authenticated');
+        }
+
         if (!apiClient || typeof apiClient.joinSyncPlayGroup !== 'function') {
             throw new Error('ApiClient.joinSyncPlayGroup unavailable');
         }
@@ -287,6 +299,11 @@
     function tryPendingJoin() {
         var groupId = root.sessionStorage.getItem(pendingKey);
         if (!groupId) return;
+
+        if (!isAuthenticated(getApiClient())) {
+            log('Debug', 'Pending join waiting for authenticated ApiClient.');
+            return;
+        }
 
         try {
             Promise.resolve(joinGroup(groupId)).then(function () {

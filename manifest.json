@@ -8,12 +8,12 @@
     "category": "General",
     "versions": [
       {
-        "version": "1.0.3.0",
-        "changelog": "Inject through index.html and the lazy-loaded SyncPlay chunk.",
+        "version": "1.0.4.0",
+        "changelog": "Fix injected config syntax and wait for authentication before joining.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.3.0.zip",
-        "checksum": "DC0C649E49338B03ADBA67198359AF29",
-        "timestamp": "2026-06-27T03:52:35",
+        "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.4.0.zip",
+        "checksum": "85A60EED207EDE539C842057717B3BB9",
+        "timestamp": "2026-06-27T04:05:06",
         "dependencies": [
           "5e87cc92-571a-4d8d-8d98-d2d4147f9f90"
         ]
