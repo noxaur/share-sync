@@ -13,7 +13,8 @@
     var pendingKey = 'syncplayShare.pendingGroupId';
     var activeKey = 'syncplayShare.activeGroupId';
     var patchedClients = new WeakSet();
-    var observer;
+    var observer = null;
+    root.SyncPlayShareLoaded = true;
 
     function logRank(level) {
         return ['Error', 'Info', 'Debug', 'Verbose'].indexOf(level);
@@ -212,22 +213,21 @@
     }
 
     function makeShareButton(settingsButton, menu) {
-        var button = settingsButton.cloneNode(true);
+        var button = root.document.createElement('button');
         button.setAttribute('data-id', 'syncplay-share');
-        button.classList.add('syncPlayShareButton');
-        button.removeAttribute('autofocus');
+        button.setAttribute('type', 'button');
+        button.setAttribute('is', 'emby-button');
+        button.className = settingsButton.className + ' syncPlayShareButton';
+        button.innerHTML = [
+            '<span class="actionsheetMenuItemIcon listItemIcon listItemIcon-transparent material-icons share" aria-hidden="true"></span>',
+            '<div class="listItemBody actionsheetListItemBody">',
+            '<div class="listItemBodyText actionSheetItemText"></div>',
+            '<div class="listItemBodyText secondary"></div>',
+            '</div>'
+        ].join('');
 
-        var icon = button.querySelector('.actionsheetMenuItemIcon');
-        if (icon) {
-            icon.className = icon.className.replace(/\bvideo_settings\b/g, '').trim() + ' share';
-            icon.textContent = '';
-        }
-
-        var text = button.querySelector('.actionSheetItemText');
-        if (text) text.textContent = config.shareButtonLabel || 'Share';
-
-        var secondary = button.querySelector('.secondary');
-        if (secondary) secondary.textContent = 'Copy SyncPlay share';
+        button.querySelector('.actionSheetItemText').textContent = config.shareButtonLabel || 'Share';
+        button.querySelector('.secondary').textContent = 'Copy SyncPlay share';
 
         button.addEventListener('click', function (event) {
             event.preventDefault();
@@ -238,18 +238,37 @@
         return button;
     }
 
+    function isSettingsButton(button) {
+        if (!button) return false;
+        if (button.getAttribute('data-id') === 'settings') return true;
+
+        var text = button.querySelector('.actionSheetItemText');
+        return text && text.textContent && text.textContent.trim().toLowerCase() === 'settings';
+    }
+
     function ensureShareButton(menu) {
         if (!menu || menu.querySelector('.syncPlayShareButton')) return;
 
         var settingsButton = menu.querySelector('[data-id="settings"]');
-        if (!settingsButton) return;
+        if (!settingsButton) {
+            settingsButton = Array.prototype.find.call(menu.querySelectorAll('.actionSheetMenuItem'), isSettingsButton);
+        }
+
+        if (!settingsButton || !settingsButton.parentNode) {
+            log('Debug', 'SyncPlay menu found without settings button.', menu);
+            return;
+        }
 
         settingsButton.parentNode.insertBefore(makeShareButton(settingsButton, menu), settingsButton);
         log('Debug', 'Share button inserted.');
     }
 
     function scanMenus() {
-        root.document.querySelectorAll('.syncPlayGroupMenu').forEach(ensureShareButton);
+        root.document.querySelectorAll('.syncPlayGroupMenu, .actionSheet').forEach(function (menu) {
+            if (menu.querySelector('[data-id="leave-group"], [data-id="halt-playback"], [data-id="resume-playback"]')) {
+                ensureShareButton(menu);
+            }
+        });
     }
 
     function joinGroup(groupId) {
@@ -309,10 +328,11 @@
         log('Info', 'Initialized.');
     }
 
-    root.SyncPlayShare = {
+        root.SyncPlayShare = {
         buildShareUrl: buildShareUrl,
         readShareId: readShareId,
-        shouldLog: shouldLog
+        shouldLog: shouldLog,
+        scanMenus: scanMenus
     };
 
     if (typeof module !== 'undefined') {

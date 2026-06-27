@@ -50,7 +50,7 @@ public static class TransformationPatches
             Uri.EscapeDataString(version));
         string scriptTag = string.Format(
             CultureInfo.InvariantCulture,
-            "<script type=\"text/javascript\" plugin=\"Jellyfin.Plugin.SyncPlayShare\" src=\"{0}\" defer></script>",
+            "<!-- Jellyfin.Plugin.SyncPlayShare injected --><script type=\"text/javascript\" plugin=\"Jellyfin.Plugin.SyncPlayShare\" src=\"{0}\" defer></script>",
             scriptUrl);
 
         plugin.LogDebug("Injecting script: " + scriptUrl);

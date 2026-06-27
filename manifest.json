@@ -8,12 +8,12 @@
     "category": "General",
     "versions": [
       {
-        "version": "1.0.1.0",
-        "changelog": "Fix File Transformation load-context payload registration.",
+        "version": "1.0.2.0",
+        "changelog": "Make SyncPlay menu button injection more robust.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.1.0.zip",
-        "checksum": "44A168ACCCC7A6236575D329F826A6D5",
-        "timestamp": "2026-06-27T03:31:23",
+        "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.2.0.zip",
+        "checksum": "D25A27301E2B0089AB7F2047AD5B8853",
+        "timestamp": "2026-06-27T03:43:49",
         "dependencies": [
           "5e87cc92-571a-4d8d-8d98-d2d4147f9f90"
         ]
