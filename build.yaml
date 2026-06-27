@@ -1,7 +1,7 @@
 ---
 name: "SyncPlay Share"
 guid: "43f7bc73-726d-4f80-8f26-626a7b4d4b0f"
-version: "1.0.7.4"
+version: "1.0.7.5"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 overview: "Share Jellyfin SyncPlay groups with existing users"
