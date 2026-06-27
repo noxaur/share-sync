@@ -17,7 +17,6 @@
     <PackageReference Include="Jellyfin.Model" Version="10.11.11">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
   <ItemGroup>

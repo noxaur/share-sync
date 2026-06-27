@@ -26,10 +26,16 @@ Install **File Transformation** first, then install **SyncPlay Share** from the 
 dotnet build Jellyfin.Plugin.SyncPlayShare.sln /property:GenerateFullPaths=true /consoleloggerparameters:NoSummary
 ```
 
-The plugin DLL is emitted at:
+The debug plugin DLL is emitted at:
 
 ```text
 Jellyfin.Plugin.SyncPlayShare/bin/Debug/net9.0/Jellyfin.Plugin.SyncPlayShare.dll
+```
+
+The test catalog serves:
+
+```text
+dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.1.0.zip
 ```
 
 ## Test

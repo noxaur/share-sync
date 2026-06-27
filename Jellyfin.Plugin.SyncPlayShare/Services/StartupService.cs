@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.SyncPlayShare.Helpers;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 
 namespace Jellyfin.Plugin.SyncPlayShare.Services;
 
@@ -76,16 +76,25 @@ public class StartupService : IScheduledTask
                 return Task.CompletedTask;
             }
 
-            JObject payload = new JObject
+            Dictionary<string, string?> payload = new Dictionary<string, string?>
             {
-                { "id", "c282f8dd-2b02-45dd-b1b6-6c168b43c0a5" },
-                { "fileNamePattern", "index\\.html" },
-                { "callbackAssembly", GetType().Assembly.FullName },
-                { "callbackClass", typeof(TransformationPatches).FullName },
-                { "callbackMethod", nameof(TransformationPatches.IndexHtml) }
+                ["id"] = "c282f8dd-2b02-45dd-b1b6-6c168b43c0a5",
+                ["fileNamePattern"] = "index\\.html",
+                ["callbackAssembly"] = GetType().Assembly.FullName,
+                ["callbackClass"] = typeof(TransformationPatches).FullName,
+                ["callbackMethod"] = nameof(TransformationPatches.IndexHtml)
             };
+            Type payloadType = registerMethod.GetParameters()[0].ParameterType;
+            MethodInfo? parseMethod = payloadType.GetMethod("Parse", [typeof(string)]);
+            object? fileTransformationPayload = parseMethod?.Invoke(null, [JsonSerializer.Serialize(payload)]);
 
-            registerMethod.Invoke(null, new object?[] { payload });
+            if (fileTransformationPayload is null)
+            {
+                plugin.LogError(null, "Could not create File Transformation payload.");
+                return Task.CompletedTask;
+            }
+
+            registerMethod.Invoke(null, [fileTransformationPayload]);
             plugin.LogInfo("File Transformation registered for index.html.");
         }
         catch (Exception ex)
