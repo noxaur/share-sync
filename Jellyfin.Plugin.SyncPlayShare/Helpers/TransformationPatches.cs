@@ -11,7 +11,7 @@ public static class TransformationPatches
 {
     private const string InlineMarker = "Jellyfin.Plugin.SyncPlayShare injected";
     private const string ChunkLoader =
-        ";(function(w,d){if(w.SyncPlayShareLoaded)return;var s=d.createElement('script');s.src='/SyncPlayShare/syncplay-share.js';d.head.appendChild(s);})(window,document);";
+        ";(function(w,d){if(w.SyncPlayShareLoaded||w.syncplayShareLoading)return;w.syncplayShareLoading=1;var s=d.createElement('script');s.src='/SyncPlayShare/syncplay-share.js';d.head.appendChild(s);})(window,document);";
 
     /// <summary>
     /// Injects the SyncPlay Share script into jellyfin-web.

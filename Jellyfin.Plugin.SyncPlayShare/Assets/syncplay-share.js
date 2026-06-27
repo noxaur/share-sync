@@ -12,15 +12,16 @@
     if (root.document && root.SyncPlayShareLoaded) {
         return;
     }
+    root.SyncPlayShareLoaded = true;
 
     var prefix = '[SyncPlayShare]';
     var pendingKey = 'syncplayShare.pendingGroupId';
     var activeKey = 'syncplayShare.activeGroupId';
+    var joinLockKey = 'syncplayShare.joinLock';
     var patchedClients = new WeakSet();
     var observer = null;
     var initialized = false;
-    var pendingJoinInFlight = null;
-    root.SyncPlayShareLoaded = true;
+    var pendingJoinPoll = null;
 
     function logRank(level) {
         return ['Error', 'Info', 'Debug', 'Verbose'].indexOf(level);
@@ -62,8 +63,43 @@
     }
 
     function clearActiveGroup() {
+        var active = root.sessionStorage.getItem(activeKey);
         root.sessionStorage.removeItem(activeKey);
+        if (active && root.sessionStorage.getItem(joinLockKey) === joinLockDone(active)) {
+            root.sessionStorage.removeItem(joinLockKey);
+        }
         log('Debug', 'Cleared active group.');
+    }
+
+    function joinLockDone(groupId) {
+        return 'done:' + groupId;
+    }
+
+    function acquireJoinLock(groupId) {
+        if (!groupId) return true;
+        var lock = root.sessionStorage.getItem(joinLockKey);
+        if (lock === joinLockDone(groupId)) {
+            return false;
+        }
+        if (lock === groupId) {
+            return true;
+        }
+        if (lock) {
+            return false;
+        }
+        root.sessionStorage.setItem(joinLockKey, groupId);
+        return true;
+    }
+
+    function releaseJoinLock(groupId, succeeded) {
+        if (!groupId) return;
+        if (succeeded) {
+            root.sessionStorage.setItem(joinLockKey, joinLockDone(groupId));
+            return;
+        }
+        if (root.sessionStorage.getItem(joinLockKey) === groupId) {
+            root.sessionStorage.removeItem(joinLockKey);
+        }
     }
 
     function toast(message, error) {
@@ -111,8 +147,22 @@
         if (typeof apiClient.joinSyncPlayGroup === 'function') {
             var joinSyncPlayGroup = apiClient.joinSyncPlayGroup;
             apiClient.joinSyncPlayGroup = function (options) {
-                if (options && options.GroupId) rememberActiveGroup(options.GroupId);
-                return joinSyncPlayGroup.apply(this, arguments);
+                var groupId = options && options.GroupId;
+                if (groupId && !acquireJoinLock(groupId)) {
+                    log('Debug', 'Skipping duplicate SyncPlay join.', groupId);
+                    return Promise.resolve();
+                }
+
+                if (groupId) rememberActiveGroup(groupId);
+                var result = joinSyncPlayGroup.apply(this, arguments);
+                if (groupId) {
+                    Promise.resolve(result).then(function () {
+                        releaseJoinLock(groupId, true);
+                    }, function () {
+                        releaseJoinLock(groupId, false);
+                    });
+                }
+                return result;
             };
         }
 
@@ -297,10 +347,21 @@
         }
 
         return apiClient.joinSyncPlayGroup({ GroupId: groupId }).then(function () {
-            rememberActiveGroup(groupId);
             toast('SyncPlay share joined.');
             log('Info', 'Joined shared SyncPlay group.', groupId);
         });
+    }
+
+    function schedulePendingJoinPoll() {
+        if (pendingJoinPoll || !root.sessionStorage.getItem(pendingKey)) return;
+        pendingJoinPoll = root.setInterval(function () {
+            if (!root.sessionStorage.getItem(pendingKey)) {
+                root.clearInterval(pendingJoinPoll);
+                pendingJoinPoll = null;
+                return;
+            }
+            tryPendingJoin();
+        }, 1000);
     }
 
     function tryPendingJoin() {
@@ -312,24 +373,26 @@
             return;
         }
 
-        // ponytail: in-flight + early pendingKey clear; observer/setInterval used to stack joins before resolve
-        if (pendingJoinInFlight === groupId) return;
-
-        if (!isAuthenticated(getApiClient())) {
-            log('Debug', 'Pending join waiting for authenticated ApiClient.');
+        if (root.sessionStorage.getItem(joinLockKey) === joinLockDone(groupId)) {
+            root.sessionStorage.removeItem(pendingKey);
             return;
         }
 
-        pendingJoinInFlight = groupId;
+        if (root.sessionStorage.getItem(joinLockKey) === groupId) {
+            return;
+        }
+
+        if (!isAuthenticated(getApiClient())) {
+            log('Debug', 'Pending join waiting for authenticated ApiClient.');
+            schedulePendingJoinPoll();
+            return;
+        }
+
         root.sessionStorage.removeItem(pendingKey);
 
         Promise.resolve(joinGroup(groupId)).catch(function (error) {
             log('Error', 'Pending SyncPlay join failed.', error);
             toast('SyncPlay share join failed.', true);
-        }).finally(function () {
-            if (pendingJoinInFlight === groupId) {
-                pendingJoinInFlight = null;
-            }
         });
     }
 
@@ -339,6 +402,7 @@
 
         root.sessionStorage.setItem(pendingKey, groupId);
         stripShareParam();
+        schedulePendingJoinPoll();
         log('Debug', 'Captured pending share.', groupId);
     }
 
@@ -386,7 +450,5 @@
         } else {
             init();
         }
-
-        root.setInterval(init, 1000);
     }
 })(typeof window !== 'undefined' ? window : globalThis);
