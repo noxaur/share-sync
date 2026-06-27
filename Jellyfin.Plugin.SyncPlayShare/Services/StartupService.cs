@@ -80,7 +80,7 @@ public class StartupService : IScheduledTask
                 registerMethod,
                 plugin,
                 "c282f8dd-2b02-45dd-b1b6-6c168b43c0a5",
-                "^index\\.html$",
+                "^/?index\\.html$",
                 nameof(TransformationPatches.IndexHtml));
         }
         catch (Exception ex)
