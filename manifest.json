@@ -8,12 +8,12 @@
     "category": "General",
     "versions": [
       {
-        "version": "1.0.7.9",
-        "changelog": "Inject external SyncPlay Share script tag.",
+        "version": "1.0.8.0",
+        "changelog": "Add debug instrumentation for SyncPlay menu injection.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.7.9.zip",
-        "checksum": "FE861451D8699DAFC6BA00E6167C2920",
-        "timestamp": "2026-06-27T11:04:59",
+        "sourceUrl": "https://raw.githubusercontent.com/noxaur/share-sync/main/dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.8.0.zip",
+        "checksum": "BD01B74EB0127C1DC3537801034A01C1",
+        "timestamp": "2026-06-27T12:25:05",
         "dependencies": [
           "5e87cc92-571a-4d8d-8d98-d2d4147f9f90"
         ]
