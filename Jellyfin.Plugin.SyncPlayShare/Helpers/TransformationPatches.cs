@@ -21,8 +21,21 @@ public static class TransformationPatches
     /// <returns>The transformed content.</returns>
     public static string IndexHtml(PatchRequestPayload payload)
     {
+        try
+        {
+            return IndexHtmlCore(payload);
+        }
+        catch (Exception ex)
+        {
+            Plugin.Instance?.LogError(ex, "IndexHtml transformation failed; leaving payload unchanged.");
+            return payload?.Contents ?? string.Empty;
+        }
+    }
+
+    private static string IndexHtmlCore(PatchRequestPayload payload)
+    {
         Plugin? plugin = Plugin.Instance;
-        string contents = payload.Contents ?? string.Empty;
+        string contents = payload?.Contents ?? string.Empty;
 
         plugin?.LogVerbose("IndexHtml transformation callback entered.");
 
