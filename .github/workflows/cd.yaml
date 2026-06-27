@@ -28,6 +28,7 @@ jobs:
         with:
           node-version: '22'
       - run: node scripts/syncplay-share.selftest.js
+      - run: node scripts/transformation-pattern.selftest.js
       - run: node scripts/package-plugin.js --bump-revision
       - name: Commit catalog update
         run: |
