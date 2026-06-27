@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Reflection;
 using Jellyfin.Plugin.SyncPlayShare.Helpers;
+using Jellyfin.Plugin.SyncPlayShare.Models;
 using Jellyfin.Plugin.SyncPlayShare.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -26,7 +27,7 @@ public class SyncPlayShareController : ControllerBase
         plugin?.LogInfo("Script served.");
         if (plugin is not null)
         {
-            StartupService.RegisterTransformations(plugin);
+            StartupService.RegisterTransformations(plugin, plugin.ServerConfigurationManager.ApplicationPaths);
         }
 
         Response.Headers["X-SyncPlayShare-Version"] = typeof(Plugin).Assembly.GetName().Version?.ToString();
@@ -59,5 +60,31 @@ public class SyncPlayShareController : ControllerBase
         script = plugin is null ? script : PluginScriptRenderer.Render(script, plugin.Configuration);
 
         return Content(script, "application/javascript");
+    }
+
+    /// <summary>
+    /// Transforms index.html for File Transformation.
+    /// </summary>
+    /// <param name="payload">The file contents.</param>
+    /// <returns>The transformed HTML.</returns>
+    [HttpPost("transform/index-html")]
+    [Produces("text/html")]
+    public ActionResult TransformIndexHtml([FromBody] PatchRequestPayload payload)
+    {
+        Plugin.Instance?.LogDebug("IndexHtml transform endpoint called.");
+        return Content(TransformationPatches.IndexHtml(payload), "text/html");
+    }
+
+    /// <summary>
+    /// Transforms the SyncPlay web chunk for File Transformation.
+    /// </summary>
+    /// <param name="payload">The file contents.</param>
+    /// <returns>The transformed JavaScript.</returns>
+    [HttpPost("transform/syncplay-chunk")]
+    [Produces("application/javascript")]
+    public ActionResult TransformSyncPlayChunk([FromBody] PatchRequestPayload payload)
+    {
+        Plugin.Instance?.LogDebug("SyncPlayChunk transform endpoint called.");
+        return Content(TransformationPatches.SyncPlayChunk(payload), "application/javascript");
     }
 }

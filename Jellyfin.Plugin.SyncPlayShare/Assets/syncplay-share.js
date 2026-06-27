@@ -323,13 +323,11 @@
             }
         });
         // #region agent log
-        if (candidates.length) {
-            debugLog('H2', 'syncplay-share.js:scanMenus', 'Menu scan', {
-                candidateCount: candidates.length,
-                syncPlayMenuCount: syncPlayMenus,
-                hasShareButton: !!root.document.querySelector('.syncPlayShareButton')
-            });
-        }
+        debugLog('H2', 'syncplay-share.js:scanMenus', 'Menu scan', {
+            candidateCount: candidates.length,
+            syncPlayMenuCount: syncPlayMenus,
+            hasShareButton: !!root.document.querySelector('.syncPlayShareButton')
+        });
         // #endregion
     }
 
@@ -382,11 +380,19 @@
     }
 
     function init() {
-        if (!config.enabled || !root.document) return;
+        if (!config.enabled || !root.document) {
+            // #region agent log
+            debugLog('H1', 'syncplay-share.js:init', 'Skipped', { reason: 'disabled or no document' });
+            // #endregion
+            return;
+        }
 
         captureShareParam();
         if (isLoginRoute()) {
             log('Debug', 'Login route detected; SyncPlay Share waiting.');
+            // #region agent log
+            debugLog('H1', 'syncplay-share.js:init', 'Skipped', { reason: 'login route' });
+            // #endregion
             return;
         }
 

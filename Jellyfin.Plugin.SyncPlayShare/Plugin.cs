@@ -33,7 +33,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         Instance = this;
         ServerConfigurationManager = serverConfigurationManager;
-        StartupService.RegisterTransformations(this);
+        StartupService.RegisterTransformations(this, applicationPaths);
     }
 
     /// <inheritdoc />

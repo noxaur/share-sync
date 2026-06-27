@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.SyncPlayShare.Helpers;
+using MediaBrowser.Common.Configuration;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -20,14 +23,17 @@ public class StartupService : IScheduledTask
     private static readonly object RegistrationSync = new object();
     private static bool _registered;
     private readonly ILogger<StartupService> _logger;
+    private readonly IApplicationPaths _applicationPaths;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="StartupService"/> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
-    public StartupService(ILogger<StartupService> logger)
+    /// <param name="applicationPaths">The application paths.</param>
+    public StartupService(ILogger<StartupService> logger, IApplicationPaths applicationPaths)
     {
         _logger = logger;
+        _applicationPaths = applicationPaths;
     }
 
     /// <inheritdoc />
@@ -57,7 +63,7 @@ public class StartupService : IScheduledTask
         plugin.LogInfo("Config loaded.");
         plugin.LogDebug("Enabled=" + plugin.Configuration.Enabled + ", LogLevel=" + plugin.Configuration.LogLevel + ", ClientConsoleLogging=" + plugin.Configuration.ClientConsoleLogging + ", CopyToastEnabled=" + plugin.Configuration.CopyToastEnabled + ", ShareButtonLabel=" + plugin.Configuration.ShareButtonLabel);
 
-        RegisterTransformations(plugin);
+        RegisterTransformations(plugin, _applicationPaths);
 
         return Task.CompletedTask;
     }
@@ -66,7 +72,8 @@ public class StartupService : IScheduledTask
     /// Registers the web transformations.
     /// </summary>
     /// <param name="plugin">The plugin instance.</param>
-    public static void RegisterTransformations(Plugin plugin)
+    /// <param name="applicationPaths">Optional application paths for chunk discovery.</param>
+    public static void RegisterTransformations(Plugin plugin, IApplicationPaths? applicationPaths = null)
     {
         lock (RegistrationSync)
         {
@@ -96,12 +103,17 @@ public class StartupService : IScheduledTask
                     return;
                 }
 
-                RegisterTransformation(
-                    registerMethod,
-                    plugin,
-                    "c282f8dd-2b02-45dd-b1b6-6c168b43c0a5",
-                    "(^|[\\\\/])index\\.html$",
-                    nameof(TransformationPatches.IndexHtml));
+                if (!RegisterTransformation(
+                        registerMethod,
+                        plugin,
+                        "c282f8dd-2b02-45dd-b1b6-6c168b43c0a5",
+                        "(^|[\\\\/])index\\.html$",
+                        "/SyncPlayShare/transform/index-html"))
+                {
+                    return;
+                }
+
+                RegisterSyncPlayChunkTransformations(registerMethod, plugin, applicationPaths);
                 _registered = true;
             }
             catch (Exception ex)
@@ -123,20 +135,18 @@ public class StartupService : IScheduledTask
         ];
     }
 
-    private static void RegisterTransformation(
+    private static bool RegisterTransformation(
         MethodInfo registerMethod,
         Plugin plugin,
         string id,
         string fileNamePattern,
-        string callbackMethod)
+        string transformationEndpoint)
     {
         Dictionary<string, string?> payload = new Dictionary<string, string?>
         {
             ["id"] = id,
             ["fileNamePattern"] = fileNamePattern,
-            ["callbackAssembly"] = typeof(StartupService).Assembly.FullName,
-            ["callbackClass"] = typeof(TransformationPatches).FullName,
-            ["callbackMethod"] = callbackMethod
+            ["transformationEndpoint"] = transformationEndpoint
         };
         Type payloadType = registerMethod.GetParameters()[0].ParameterType;
         MethodInfo? parseMethod = payloadType.GetMethod("Parse", [typeof(string)]);
@@ -144,11 +154,54 @@ public class StartupService : IScheduledTask
 
         if (fileTransformationPayload is null)
         {
-            plugin.LogError(null, "Could not create File Transformation payload.");
-            return;
+            plugin.LogError(null, "Could not create File Transformation payload for " + fileNamePattern + ".");
+            return false;
         }
 
         registerMethod.Invoke(null, [fileTransformationPayload]);
-        plugin.LogInfo("File Transformation registered for " + fileNamePattern + ".");
+        plugin.LogInfo("File Transformation registered for " + fileNamePattern + " via " + transformationEndpoint + ".");
+        return true;
+    }
+
+    private static void RegisterSyncPlayChunkTransformations(
+        MethodInfo registerMethod,
+        Plugin plugin,
+        IApplicationPaths? applicationPaths)
+    {
+        if (applicationPaths is null
+            || string.IsNullOrWhiteSpace(applicationPaths.WebPath)
+            || !Directory.Exists(applicationPaths.WebPath))
+        {
+            plugin.LogDebug("Jellyfin web path missing; skipping SyncPlay chunk transformation.");
+            return;
+        }
+
+        Regex chunkName = new Regex(@"([^.]+)\.[^.]+\.chunk\.js", RegexOptions.Compiled);
+        foreach (string jsChunk in Directory.GetFiles(applicationPaths.WebPath, "*.chunk.js", SearchOption.AllDirectories))
+        {
+            string chunkContents = File.ReadAllText(jsChunk);
+            if (!chunkContents.Contains("halt-playback", StringComparison.Ordinal)
+                || !chunkContents.Contains("leave-group", StringComparison.Ordinal)
+                || !chunkContents.Contains("settings", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string fileName = Path.GetFileName(jsChunk);
+            Match match = chunkName.Match(fileName);
+            if (!match.Success)
+            {
+                continue;
+            }
+
+            string fileNamePattern = match.Groups[1].Value + "\\.[^.]+\\.chunk\\.js";
+            plugin.LogInfo("Found SyncPlay menu chunk " + fileName + ".");
+            RegisterTransformation(
+                registerMethod,
+                plugin,
+                Guid.NewGuid().ToString(),
+                fileNamePattern,
+                "/SyncPlayShare/transform/syncplay-chunk");
+        }
     }
 }
