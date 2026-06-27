@@ -33,5 +33,6 @@ const renderedScript = rawScript.replace(
   }),
 );
 new vm.Script(renderedScript);
+assert.match(rawScript, /pendingJoinInFlight/);
 
 console.log('syncplay-share self-check passed');

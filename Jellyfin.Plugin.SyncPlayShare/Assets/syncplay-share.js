@@ -14,32 +14,12 @@
     }
 
     var prefix = '[SyncPlayShare]';
-    // #region agent log
-    function debugLog(hypothesisId, location, message, data) {
-        fetch('http://127.0.0.1:7309/ingest/ea0abf19-45e6-4f64-82df-f49129b88600', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '856118' },
-            body: JSON.stringify({
-                sessionId: '856118',
-                hypothesisId: hypothesisId,
-                location: location,
-                message: message,
-                data: data || {},
-                timestamp: Date.now()
-            })
-        }).catch(function () {});
-    }
-    debugLog('H1', 'syncplay-share.js:boot', 'Script executing', {
-        enabled: config.enabled,
-        alreadyLoaded: !!root.SyncPlayShareLoaded,
-        href: root.location && root.location.href
-    });
-    // #endregion
     var pendingKey = 'syncplayShare.pendingGroupId';
     var activeKey = 'syncplayShare.activeGroupId';
     var patchedClients = new WeakSet();
     var observer = null;
     var initialized = false;
+    var pendingJoinInFlight = null;
     root.SyncPlayShareLoaded = true;
 
     function logRank(level) {
@@ -291,44 +271,19 @@
 
         if (!settingsButton || !settingsButton.parentNode) {
             log('Debug', 'SyncPlay menu found without settings button.', menu);
-            // #region agent log
-            debugLog('H3', 'syncplay-share.js:ensureShareButton', 'Settings button missing', {
-                menuClass: menu.className,
-                menuItemCount: menu.querySelectorAll('.actionSheetMenuItem').length,
-                dataIds: Array.prototype.map.call(menu.querySelectorAll('[data-id]'), function (el) {
-                    return el.getAttribute('data-id');
-                })
-            });
-            // #endregion
             return;
         }
 
         settingsButton.parentNode.insertBefore(makeShareButton(settingsButton, menu), settingsButton);
         log('Debug', 'Share button inserted.');
-        // #region agent log
-        debugLog('H3', 'syncplay-share.js:ensureShareButton', 'Share button inserted', {
-            menuClass: menu.className
-        });
-        // #endregion
     }
 
     function scanMenus() {
-        var candidates = root.document.querySelectorAll('.syncPlayGroupMenu, .actionSheet');
-        var syncPlayMenus = 0;
-        candidates.forEach(function (menu) {
-            var markers = menu.querySelectorAll('[data-id="leave-group"], [data-id="halt-playback"], [data-id="resume-playback"]');
-            if (markers.length) {
-                syncPlayMenus += 1;
+        root.document.querySelectorAll('.syncPlayGroupMenu, .actionSheet').forEach(function (menu) {
+            if (menu.querySelector('[data-id="leave-group"], [data-id="halt-playback"], [data-id="resume-playback"]')) {
                 ensureShareButton(menu);
             }
         });
-        // #region agent log
-        debugLog('H2', 'syncplay-share.js:scanMenus', 'Menu scan', {
-            candidateCount: candidates.length,
-            syncPlayMenuCount: syncPlayMenus,
-            hasShareButton: !!root.document.querySelector('.syncPlayShareButton')
-        });
-        // #endregion
     }
 
     function joinGroup(groupId) {
@@ -352,22 +307,30 @@
         var groupId = root.sessionStorage.getItem(pendingKey);
         if (!groupId) return;
 
+        if (root.sessionStorage.getItem(activeKey) === groupId) {
+            root.sessionStorage.removeItem(pendingKey);
+            return;
+        }
+
+        // ponytail: in-flight + early pendingKey clear; observer/setInterval used to stack joins before resolve
+        if (pendingJoinInFlight === groupId) return;
+
         if (!isAuthenticated(getApiClient())) {
             log('Debug', 'Pending join waiting for authenticated ApiClient.');
             return;
         }
 
-        try {
-            Promise.resolve(joinGroup(groupId)).then(function () {
-                root.sessionStorage.removeItem(pendingKey);
-            }).catch(function (error) {
-                root.sessionStorage.removeItem(pendingKey);
-                log('Error', 'Pending SyncPlay join failed.', error);
-                toast('SyncPlay share join failed.', true);
-            });
-        } catch (error) {
-            log('Debug', 'Pending join waiting for ApiClient.', error);
-        }
+        pendingJoinInFlight = groupId;
+        root.sessionStorage.removeItem(pendingKey);
+
+        Promise.resolve(joinGroup(groupId)).catch(function (error) {
+            log('Error', 'Pending SyncPlay join failed.', error);
+            toast('SyncPlay share join failed.', true);
+        }).finally(function () {
+            if (pendingJoinInFlight === groupId) {
+                pendingJoinInFlight = null;
+            }
+        });
     }
 
     function captureShareParam() {
@@ -380,19 +343,11 @@
     }
 
     function init() {
-        if (!config.enabled || !root.document) {
-            // #region agent log
-            debugLog('H1', 'syncplay-share.js:init', 'Skipped', { reason: 'disabled or no document' });
-            // #endregion
-            return;
-        }
+        if (!config.enabled || !root.document) return;
 
         captureShareParam();
         if (isLoginRoute()) {
             log('Debug', 'Login route detected; SyncPlay Share waiting.');
-            // #region agent log
-            debugLog('H1', 'syncplay-share.js:init', 'Skipped', { reason: 'login route' });
-            // #endregion
             return;
         }
 
@@ -409,16 +364,9 @@
         observer = new MutationObserver(function () {
             patchApiClient(getApiClient());
             scanMenus();
-            tryPendingJoin();
         });
         observer.observe(root.document.documentElement, { childList: true, subtree: true });
         log('Info', 'Initialized.');
-        // #region agent log
-        debugLog('H1', 'syncplay-share.js:init', 'Initialized', {
-            authenticated: isAuthenticated(getApiClient()),
-            hasShareButton: !!root.document.querySelector('.syncPlayShareButton')
-        });
-        // #endregion
     }
 
     root.SyncPlayShare = {
