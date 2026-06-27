@@ -18,6 +18,7 @@
     var activeKey = 'syncplayShare.activeGroupId';
     var patchedClients = new WeakSet();
     var observer = null;
+    var initialized = false;
     root.SyncPlayShareLoaded = true;
 
     function logRank(level) {
@@ -140,6 +141,11 @@
         var apiClient = root.ApiClient;
         if (apiClient) patchApiClient(apiClient);
         return apiClient;
+    }
+
+    function isLoginRoute() {
+        var text = (root.location.pathname + root.location.hash).toLowerCase();
+        return text.indexOf('/login') !== -1 || text.indexOf('login.html') !== -1 || text.indexOf('session-login') !== -1;
     }
 
     function isAuthenticated(apiClient) {
@@ -331,6 +337,17 @@
         if (!config.enabled || !root.document) return;
 
         captureShareParam();
+        if (isLoginRoute()) {
+            log('Debug', 'Login route detected; SyncPlay Share waiting.');
+            return;
+        }
+
+        if (initialized) {
+            tryPendingJoin();
+            return;
+        }
+
+        initialized = true;
         patchApiClient(getApiClient());
         scanMenus();
         tryPendingJoin();
@@ -341,11 +358,10 @@
             tryPendingJoin();
         });
         observer.observe(root.document.documentElement, { childList: true, subtree: true });
-        root.setInterval(tryPendingJoin, 1000);
         log('Info', 'Initialized.');
     }
 
-        root.SyncPlayShare = {
+    root.SyncPlayShare = {
         buildShareUrl: buildShareUrl,
         readShareId: readShareId,
         shouldLog: shouldLog,
@@ -362,5 +378,7 @@
         } else {
             init();
         }
+
+        root.setInterval(init, 1000);
     }
 })(typeof window !== 'undefined' ? window : globalThis);
