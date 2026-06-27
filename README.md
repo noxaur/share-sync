@@ -10,6 +10,16 @@ This plugin targets Jellyfin `10.11.x` and uses [File Transformation](https://gi
 - .NET SDK 9.0 to build
 - File Transformation plugin installed in Jellyfin
 
+## Install Test Build
+
+Add this plugin repository URL in Jellyfin:
+
+```text
+https://raw.githubusercontent.com/noxaur/share-sync/main/manifest.json
+```
+
+Install **File Transformation** first, then install **SyncPlay Share** from the catalog and restart Jellyfin.
+
 ## Build
 
 ```sh
