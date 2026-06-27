@@ -18,7 +18,7 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    if: github.actor != 'github-actions[bot]'
+    if: github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
