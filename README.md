@@ -35,7 +35,7 @@ Jellyfin.Plugin.SyncPlayShare/bin/Debug/net9.0/Jellyfin.Plugin.SyncPlayShare.dll
 The test catalog serves:
 
 ```text
-dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.6.2.zip
+dist/Jellyfin.Plugin.SyncPlayShare_10.11.0_1.0.7.0.zip
 ```
 
 ## Test
