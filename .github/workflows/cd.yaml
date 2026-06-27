@@ -1,0 +1,41 @@
+name: '📦 Update Plugin Catalog'
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Directory.Build.props'
+      - 'Jellyfin.Plugin.SyncPlayShare.sln'
+      - 'Jellyfin.Plugin.SyncPlayShare/**'
+      - 'build.yaml'
+      - 'scripts/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/syncplay-share.selftest.js
+      - run: node scripts/package-plugin.js
+      - name: Commit catalog update
+        run: |
+          if git diff --quiet -- manifest.json dist; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add manifest.json dist
+          git commit -m "chore: update plugin catalog"
+          git push
