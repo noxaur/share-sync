@@ -61,27 +61,6 @@ public static class TransformationPatches
         return contents.Insert(bodyIndex, scriptTag);
     }
 
-    /// <summary>
-    /// Appends SyncPlay Share to the lazy-loaded SyncPlay chunk.
-    /// </summary>
-    /// <param name="payload">The File Transformation payload.</param>
-    /// <returns>The transformed content.</returns>
-    public static string SyncPlayChunk(PatchRequestPayload payload)
-    {
-        Plugin? plugin = Plugin.Instance;
-        string contents = payload.Contents ?? string.Empty;
-
-        plugin?.LogVerbose("SyncPlayChunk transformation callback entered.");
-
-        if (plugin is null || !plugin.Configuration.Enabled || contents.Contains(InlineMarker, StringComparison.Ordinal))
-        {
-            return contents;
-        }
-
-        plugin.LogDebug("Appending SyncPlay Share script to SyncPlay chunk.");
-        return contents + "\n/* " + InlineMarker + " */\n" + GetClientScript(plugin);
-    }
-
     private static string GetClientScript(Plugin plugin)
     {
         Stream? stream = Assembly.GetExecutingAssembly()
